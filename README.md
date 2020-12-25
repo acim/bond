@@ -1,5 +1,7 @@
 # bond
 
+Kubernetes secrets replication over namespaces
+
 ## License
 
 Licensed under either of

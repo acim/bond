@@ -2,9 +2,11 @@ FROM rust:1.48.0 AS builder
 
 WORKDIR /app
 
+RUN cargo install cargo-strip
+
 ADD . /app
 
-RUN cargo build --release
+RUN cargo build --release --all-features && cargo strip
 
 FROM gcr.io/distroless/cc
 

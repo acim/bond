@@ -21,7 +21,7 @@ async fn main() -> anyhow::Result<()> {
     env_logger::init();
 
     let client = Client::try_default().await?;
-    let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
+    let namespace = std::env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
 
     let cms: Api<Secret> = Api::namespaced(client, &namespace);
     let lp = ListParams::default().allow_bookmarks();
