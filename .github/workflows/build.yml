@@ -8,7 +8,7 @@ jobs:
     steps:
       - name: Check out
         uses: actions/checkout@v2
-      - name: Install latest nightly
+      - name: Install rustfmt and clippy
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
