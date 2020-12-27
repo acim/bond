@@ -14,16 +14,32 @@ use kube::{
     Client,
 };
 use kube_runtime::watcher;
+use serde_derive::{Deserialize, Serialize};
+
+#[derive(Debug, Serialize, Deserialize)]
+struct SecretReplica {
+    source: String,
+    destination: Vec<String>,
+}
+
+#[derive(Default, Debug, Serialize, Deserialize)]
+struct Config {
+    replica: Vec<SecretReplica>,
+}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    let cfg: Config = confy::load("/home/acim/Projects/public/bond/Config").unwrap();
+    dbg!(cfg);
+
     std::env::set_var("RUST_LOG", "info,kube=debug");
     env_logger::init();
 
     let client = Client::try_default().await?;
-    let namespace = std::env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
+    // let namespace = std::env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
+    // let cms: Api<Secret> = Api::namespaced(client, &namespace);
 
-    let cms: Api<Secret> = Api::namespaced(client, &namespace);
+    let cms: Api<Secret> = Api::all(client);
     let lp = ListParams::default().allow_bookmarks();
 
     let mut w = watcher(cms, lp).boxed();
@@ -33,7 +49,11 @@ async fn main() -> anyhow::Result<()> {
             watcher::Event::Deleted(x) => info!("Deleted: {:?}", x.metadata.name.as_ref().unwrap()),
             watcher::Event::Restarted(x) => {
                 for y in x.iter() {
-                    info!("Restarted: {:?}", y.metadata.name.as_ref().unwrap())
+                    info!(
+                        "Restarted: {}/{}",
+                        y.metadata.namespace.as_ref().unwrap(),
+                        y.metadata.name.as_ref().unwrap()
+                    )
                 }
             }
         }

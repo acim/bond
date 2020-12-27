@@ -1,0 +1,5 @@
+---
+replica:
+  - source: default/some-secret
+    destination:
+      - default/some-other-secret
