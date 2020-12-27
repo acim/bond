@@ -1,0 +1,6 @@
+---
+replica:
+  - source: default/some-secret
+    destination:
+      - database/some-secret
+      - vmail/some-secret

@@ -39,17 +39,17 @@ struct Config {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let opt: Opt = Opt::parse();
-    dbg!(opt);
-
-    // .config.as_str().as_ref();
-    let cfg: Config = confy::load("Config").unwrap();
-    dbg!(cfg);
-
     std::env::set_var("RUST_LOG", "info,kube=debug");
     env_logger::init();
 
+    let opt: &Opt = &Opt::parse();
+    info!("Options: {:#?}", opt);
+
+    let cfg: Config = confy::load(opt.config.as_str()).unwrap();
+    info!("Config: {:#?}", cfg);
+
     let client = Client::try_default().await?;
+
     // let namespace = std::env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
     // let cms: Api<Secret> = Api::namespaced(client, &namespace);
 
