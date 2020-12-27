@@ -7,6 +7,7 @@
 
 #[macro_use]
 extern crate log;
+use clap::Clap;
 use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::Secret;
 use kube::{
@@ -15,6 +16,15 @@ use kube::{
 };
 use kube_runtime::watcher;
 use serde_derive::{Deserialize, Serialize};
+
+/// Kubernetes secrets replication across namespaces
+#[derive(Clap, Debug)]
+#[clap(name = "bond")]
+struct Opt {
+    /// Sets a custom config file
+    #[clap(short, long, default_value = "bond")]
+    config: String,
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 struct SecretReplica {
@@ -29,7 +39,11 @@ struct Config {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let cfg: Config = confy::load("/home/acim/Projects/public/bond/Config").unwrap();
+    let opt: Opt = Opt::parse();
+    dbg!(opt);
+
+    // .config.as_str().as_ref();
+    let cfg: Config = confy::load("Config").unwrap();
     dbg!(cfg);
 
     std::env::set_var("RUST_LOG", "info,kube=debug");
