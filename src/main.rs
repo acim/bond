@@ -14,7 +14,10 @@ use kube::{
     api::{Api, ListParams},
     Client,
 };
-use kube_runtime::watcher;
+use kube_runtime::{
+    watcher,
+    watcher::Event::{Applied, Deleted, Restarted},
+};
 use serde_derive::{Deserialize, Serialize};
 
 /// Kubernetes secrets replication across namespaces
@@ -59,9 +62,9 @@ async fn main() -> anyhow::Result<()> {
     let mut w = watcher(cms, lp).boxed();
     while let Some(event) = w.try_next().await? {
         match event {
-            watcher::Event::Applied(x) => info!("Applied: {:?}", x.metadata.name.as_ref().unwrap()),
-            watcher::Event::Deleted(x) => info!("Deleted: {:?}", x.metadata.name.as_ref().unwrap()),
-            watcher::Event::Restarted(x) => {
+            Applied(x) => info!("Applied: {:?}", x.metadata.name.as_ref().unwrap()),
+            Deleted(x) => info!("Deleted: {:?}", x.metadata.name.as_ref().unwrap()),
+            Restarted(x) => {
                 for y in x.iter() {
                     info!(
                         "Restarted: {}/{}",
