@@ -8,7 +8,7 @@
 #[macro_use]
 extern crate log;
 use clap::Clap;
-use futures::{StreamExt, TryStreamExt};
+use futures::{stream, StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::Secret;
 use kube::{
     api::{Api, ListParams, Meta, PostParams},
@@ -55,14 +55,20 @@ async fn main() -> anyhow::Result<()> {
 
     let client = Client::try_default().await?;
 
-    // let namespace = std::env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
-    // let cms: Api<Secret> = Api::namespaced(client, &namespace);
-
-    let cms = Api::<Secret>::all(client);
-    let cms2 = cms.clone();
+    let mut nss = Vec::with_capacity(cfg.replica.len());
     let lp = ListParams::default().allow_bookmarks();
+    for sr in cfg.replica.iter() {
+        let parts: Vec<&str> = sr.source.split("/").collect();
+        assert_eq!(parts.len(), 2);
+        let a: Api<Secret> = Api::namespaced(client.clone(), parts[0]);
+        nss.push(watcher(a, lp.clone()).boxed());
+    }
 
-    let mut w = watcher(cms, lp).boxed();
+    let cms: Api<Secret> = Api::all(client);
+
+    let mut w = stream::select_all(nss);
+
+    // let mut w = watcher(cms, lp).boxed();
     while let Some(event) = w.try_next().await? {
         match event {
             Applied(x) => info!("Applied: {:?}", x.metadata.name.as_ref().unwrap()),
@@ -84,7 +90,7 @@ async fn main() -> anyhow::Result<()> {
                         .unwrap();
 
                         let pp = PostParams::default();
-                        match cms2.create(&pp, &ns).await {
+                        match cms.create(&pp, &ns).await {
                             Ok(o) => {
                                 let tns = Meta::namespace(&o);
                                 let tn = Meta::name(&o);
