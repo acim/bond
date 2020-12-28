@@ -11,7 +11,7 @@ use clap::Clap;
 use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::Secret;
 use kube::{
-    api::{Api, ListParams},
+    api::{Api, ListParams, Meta, PostParams},
     Client,
 };
 use kube_runtime::{
@@ -19,6 +19,8 @@ use kube_runtime::{
     watcher::Event::{Applied, Deleted, Restarted},
 };
 use serde_derive::{Deserialize, Serialize};
+use serde_json::json;
+use std::io::Error;
 
 /// Kubernetes secrets replication across namespaces
 #[derive(Clap, Debug)]
@@ -57,6 +59,7 @@ async fn main() -> anyhow::Result<()> {
     // let cms: Api<Secret> = Api::namespaced(client, &namespace);
 
     let cms: Api<Secret> = Api::all(client);
+    let cms2 = cms.clone();
     let lp = ListParams::default().allow_bookmarks();
 
     let mut w = watcher(cms, lp).boxed();
@@ -70,10 +73,50 @@ async fn main() -> anyhow::Result<()> {
                         "Restarted: {}/{}",
                         y.metadata.namespace.as_ref().unwrap(),
                         y.metadata.name.as_ref().unwrap()
-                    )
+                    );
+
+                    if false {
+                        let ns = new_secret(
+                            y,
+                            y.metadata.namespace.as_ref().unwrap(),
+                            y.metadata.name.as_ref().unwrap(),
+                        )
+                        .unwrap();
+
+                        let pp = PostParams::default();
+                        match cms2.create(&pp, &ns).await {
+                            Ok(o) => {
+                                let tns = Meta::namespace(&o);
+                                let tn = Meta::name(&o);
+                                assert_eq!(Meta::name(&ns), tn);
+                                assert_eq!(Meta::namespace(&ns), tns);
+                                info!("Applied new secret: {}/{}", tns.unwrap(), tn);
+                                // wait for it..
+                                std::thread::sleep(std::time::Duration::from_millis(5_000));
+                            }
+                            Err(kube::Error::Api(ae)) => assert_eq!(ae.code, 409), // if you skipped delete, for instance
+                            Err(_e) => {} //return Err(e.into()), // any other case is probably bad
+                        }
+                    }
                 }
             }
         }
     }
     Ok(())
+}
+
+fn new_secret(_si: &Secret, ns: &str, n: &str) -> Result<Secret, Error> {
+    let so: Secret = serde_json::from_value(json!({
+        "apiVersion": "v1",
+        "kind": "Secret",
+        "metadata": {
+            "name": n,
+            "namespace": ns,
+            "annotations": {
+                "k8s.ectobit.com/bond": "true",
+            }
+        },
+        "data": {}
+    }))?;
+    Ok(so)
 }
