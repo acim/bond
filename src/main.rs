@@ -58,7 +58,7 @@ async fn main() -> anyhow::Result<()> {
     // let namespace = std::env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
     // let cms: Api<Secret> = Api::namespaced(client, &namespace);
 
-    let cms: Api<Secret> = Api::all(client);
+    let cms = Api::<Secret>::all(client);
     let cms2 = cms.clone();
     let lp = ListParams::default().allow_bookmarks();
 
