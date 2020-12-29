@@ -9,7 +9,7 @@
 extern crate log;
 use clap::Clap;
 use futures::{stream, StreamExt, TryStreamExt};
-use k8s_openapi::api::core::v1::Secret;
+use k8s_openapi::{api::core::v1::Secret, ByteString};
 use kube::{
     api::{Api, ListParams, Meta, PostParams},
     Client,
@@ -76,23 +76,18 @@ async fn main() -> anyhow::Result<()> {
 
                     for i in cfg.replica.iter() {
                         if full_name(&y) == i.source {
-                            info!("Trying to find destination {}", &i.destination[0]);
-                            let (ns, n) = split_full_name(&i.destination[0]);
-                            let cms: Api<Secret> = Api::namespaced(client.clone(), ns);
-                            match cms.get(n).await {
-                                Ok(s) => {
-                                    info!("Found {}", full_name(&s));
-                                    if y.data == s.data {
-                                        info!("Exact data, nothing to do");
-                                        continue;
-                                    }
-                                    if let Ok(ns) =
-                                        new_secret(y, Meta::namespace(y).unwrap(), Meta::name(y))
-                                    {
-                                        let pp = PostParams::default();
-                                        match cms.create(&pp, &ns).await {
+                            for d in i.destination.iter() {
+                                info!("Getting destination secret {}", &d);
+                                match get(client.clone(), &d).await {
+                                    Ok(s) => {
+                                        info!("Found {}", full_name(&s));
+                                        if y.data == s.data {
+                                            info!("Exact data, nothing to do");
+                                            continue;
+                                        }
+                                        match create(client.clone(), &d, s.data).await {
                                             Ok(o) => {
-                                                info!("Applied new secret: {}", full_name(&o));
+                                                info!("Created new secret: {}", full_name(&o));
                                                 // wait for it..
                                                 std::thread::sleep(
                                                     std::time::Duration::from_millis(5_000),
@@ -102,8 +97,8 @@ async fn main() -> anyhow::Result<()> {
                                             Err(e) => error!("Error {}", e),
                                         }
                                     }
+                                    Err(e) => error!("Error {}", e),
                                 }
-                                Err(e) => error!("Error {}", e),
                             }
                         }
                     }
@@ -114,7 +109,29 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn new_secret(_si: &Secret, ns: String, n: String) -> Result<Secret, Error> {
+async fn get(client: Client, full_name: &String) -> Result<Secret, kube::Error> {
+    let (ns, n) = split_full_name(full_name);
+    let secrets: Api<Secret> = Api::namespaced(client, ns);
+    secrets.get(n).await
+}
+
+async fn create(
+    client: Client,
+    full_name: &String,
+    data: Option<std::collections::BTreeMap<String, ByteString>>,
+) -> Result<Secret, kube::Error> {
+    let (ns, n) = split_full_name(full_name);
+    let secrets: Api<Secret> = Api::namespaced(client, ns);
+    let pp = PostParams::default();
+    let n = new_secret(ns, n, data).unwrap();
+    secrets.create(&pp, &n).await
+}
+
+fn new_secret(
+    ns: &str,
+    n: &str,
+    data: Option<std::collections::BTreeMap<String, ByteString>>,
+) -> Result<Secret, Error> {
     let so: Secret = serde_json::from_value(json!({
         "apiVersion": "v1",
         "kind": "Secret",
@@ -122,10 +139,10 @@ fn new_secret(_si: &Secret, ns: String, n: String) -> Result<Secret, Error> {
             "name": n,
             "namespace": ns,
             "annotations": {
-                "k8s.ectobit.com/bond": "true",
+                "meta.ectobit.com/managed-by": "bond",
             }
         },
-        "data": {}
+        "data": Some(data)
     }))?;
     Ok(so)
 }
