@@ -22,6 +22,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
 use std::io::Error;
+use std::sync::{Arc, RwLock};
 
 /// Kubernetes secrets replication across namespaces
 #[derive(Clap, Debug)]
@@ -144,7 +145,7 @@ fn split_full_name(s: &str) -> (&str, &str) {
 
 struct KubeApi<'a, T> {
     client: Client,
-    namespaced_api: HashMap<&'a str, Api<T>>,
+    lock: Arc<RwLock<HashMap<&'a str, Api<T>>>>,
     cluster_api: Api<T>,
 }
 
@@ -155,18 +156,25 @@ where
     fn new(client: Client) -> KubeApi<'a, T> {
         KubeApi {
             client: client.clone(),
-            namespaced_api: HashMap::with_capacity(2),
+            lock: Arc::new(RwLock::new(HashMap::with_capacity(1))),
             cluster_api: Api::<T>::all(client),
         }
     }
 
     async fn get(&mut self, full_name: &'a str) -> Result<T, kube::Error> {
         let (namespace, name) = split_full_name(full_name);
-        let api = self
-            .namespaced_api
-            .entry(namespace)
-            .or_insert(Api::<T>::namespaced(self.client.clone(), namespace));
-        api.get(name).await
+        let lock = Arc::clone(&self.lock);
+        let api = lock.read().unwrap();
+        match api.get(namespace) {
+            Some(api) => return api.get(name).await,
+            None => {
+                let mut api = lock.write().unwrap();
+                let new_api = Api::<T>::namespaced(self.client.clone(), namespace);
+                let new_api_c = new_api.clone();
+                api.insert(namespace, new_api);
+                return new_api_c.get(name).await;
+            }
+        }
     }
 
     async fn create(&self, pp: &PostParams, data: &T) -> Result<T, kube::Error> {
