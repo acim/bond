@@ -87,7 +87,10 @@ async fn main() -> anyhow::Result<()> {
                                             info!("Exact data, nothing to do");
                                             continue;
                                         }
-                                        match api.create(&d, s.data.unwrap()).await {
+                                        match api
+                                            .create(&d, s.data.unwrap(), PostParams::default())
+                                            .await
+                                        {
                                             Ok(o) => {
                                                 info!("Created new secret: {}", full_name(&o));
                                                 // wait for it..
@@ -166,13 +169,13 @@ impl<'a> KubeApi<'a> {
         &mut self,
         full_name: &'a String,
         data: std::collections::BTreeMap<String, ByteString>,
+        pp: PostParams,
     ) -> Result<Secret, kube::Error> {
         let (ns, n) = split_full_name(full_name);
         let api = self
             .namespaced_api
             .entry(ns)
             .or_insert(Api::namespaced(self.client.clone(), ns));
-        let pp = PostParams::default();
         let new = new_secret(ns, n, data).unwrap();
         api.create(&pp, &new).await
     }
