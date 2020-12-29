@@ -9,7 +9,7 @@
 extern crate log;
 use clap::Clap;
 use futures::{stream, StreamExt, TryStreamExt};
-use k8s_openapi::{api::core::v1::Secret, ByteString};
+use k8s_openapi::{api::core::v1::Secret, ByteString, Resource};
 use kube::{
     api::{Api, ListParams, Meta, PostParams},
     Client,
@@ -18,6 +18,7 @@ use kube_runtime::{
     watcher,
     watcher::Event::{Applied, Deleted, Restarted},
 };
+use serde;
 use serde_derive::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
@@ -87,10 +88,9 @@ async fn main() -> anyhow::Result<()> {
                                             info!("Exact data, nothing to do");
                                             continue;
                                         }
-                                        match api
-                                            .create(&d, s.data.unwrap(), PostParams::default())
-                                            .await
-                                        {
+                                        let pp = PostParams::default();
+                                        let new = new_secret(d, &s.data.unwrap()).unwrap();
+                                        match api.create(&d, &pp, &new).await {
                                             Ok(o) => {
                                                 info!("Created new secret: {}", full_name(&o));
                                                 // wait for it..
@@ -115,16 +115,16 @@ async fn main() -> anyhow::Result<()> {
 }
 
 fn new_secret(
-    ns: &str,
-    n: &str,
-    data: std::collections::BTreeMap<String, ByteString>,
+    full_name: &String,
+    data: &std::collections::BTreeMap<String, ByteString>,
 ) -> Result<Secret, Error> {
+    let (namespace, name) = split_full_name(full_name);
     let so: Secret = serde_json::from_value(json!({
         "apiVersion": "v1",
         "kind": "Secret",
         "metadata": {
-            "name": n,
-            "namespace": ns,
+            "name": name,
+            "namespace": namespace,
             "annotations": {
                 "meta.ectobit.com/managed-by": "bond",
             }
@@ -143,40 +143,41 @@ fn split_full_name<'a>(s: &'a String) -> (&'a str, &'a str) {
     (p[0], p[1])
 }
 
-struct KubeApi<'a> {
+struct KubeApi<'a, T> {
     client: Client,
-    namespaced_api: HashMap<&'a str, Api<Secret>>,
+    namespaced_api: HashMap<&'a str, Api<T>>,
 }
 
-impl<'a> KubeApi<'a> {
-    fn new(client: Client) -> KubeApi<'a> {
+impl<'a, T> KubeApi<'a, T>
+where
+    T: Resource + Clone + serde::de::DeserializeOwned + Meta + serde::Serialize,
+{
+    fn new(client: Client) -> KubeApi<'a, T> {
         KubeApi {
             client,
             namespaced_api: HashMap::with_capacity(2),
         }
     }
 
-    async fn get(&mut self, full_name: &'a String) -> Result<Secret, kube::Error> {
-        let (ns, n) = split_full_name(full_name);
+    async fn get(&mut self, full_name: &'a String) -> Result<T, kube::Error> {
+        let (namespace, name) = split_full_name(full_name);
         let api = self
             .namespaced_api
-            .entry(ns)
-            .or_insert(Api::namespaced(self.client.clone(), ns));
-        api.get(n).await
+            .entry(namespace)
+            .or_insert(Api::<T>::namespaced(self.client.clone(), namespace));
+        api.get(name).await
     }
 
     async fn create(
         &mut self,
-        full_name: &'a String,
-        data: std::collections::BTreeMap<String, ByteString>,
-        pp: PostParams,
-    ) -> Result<Secret, kube::Error> {
-        let (ns, n) = split_full_name(full_name);
+        namespace: &'a str,
+        pp: &PostParams,
+        data: &T,
+    ) -> Result<T, kube::Error> {
         let api = self
             .namespaced_api
-            .entry(ns)
-            .or_insert(Api::namespaced(self.client.clone(), ns));
-        let new = new_secret(ns, n, data).unwrap();
-        api.create(&pp, &new).await
+            .entry(namespace)
+            .or_insert(Api::<T>::namespaced(self.client.clone(), namespace));
+        api.create(pp, data).await
     }
 }
