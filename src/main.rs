@@ -168,7 +168,7 @@ where
 {
     fn new(client: Client) -> KubeApi<'a, T> {
         KubeApi {
-            client: client,
+            client,
             lock: Arc::new(RwLock::new(HashMap::with_capacity(1))),
         }
     }
