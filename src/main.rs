@@ -164,15 +164,14 @@ where
     async fn get(&mut self, full_name: &'a str) -> Result<T, kube::Error> {
         let (namespace, name) = split_full_name(full_name);
         let lock = Arc::clone(&self.lock);
-        let api = lock.read().unwrap();
-        match api.get(namespace) {
+        let map = lock.read().unwrap();
+        match map.get(namespace) {
             Some(api) => return api.get(name).await,
             None => {
-                let mut api = lock.write().unwrap();
+                let mut map = lock.write().unwrap();
                 let new_api = Api::<T>::namespaced(self.client.clone(), namespace);
-                let new_api_c = new_api.clone();
-                api.insert(namespace, new_api);
-                return new_api_c.get(name).await;
+                let api = map.entry(namespace).or_insert(new_api);
+                api.get(name).await
             }
         }
     }
