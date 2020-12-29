@@ -9,7 +9,7 @@
 extern crate log;
 use clap::Clap;
 use futures::{stream, StreamExt, TryStreamExt};
-use k8s_openapi::{api::core::v1::Secret, ByteString, Resource};
+use k8s_openapi::{api::core::v1::Secret, Resource};
 use kube::{
     api::{Api, ListParams, Meta, PostParams},
     Client,
@@ -85,12 +85,13 @@ async fn main() -> anyhow::Result<()> {
                                     Ok(s) => {
                                         info!("Found {}", full_name(&s));
                                         if y.data == s.data {
-                                            info!("Exact data, nothing to do");
+                                            info!("Secret up to date");
                                             continue;
                                         }
                                         let pp = PostParams::default();
-                                        let new = new_secret(d, &s.data.unwrap()).unwrap();
-                                        match api.create(&pp, &new).await {
+                                        let new = new_secret(d, &s).unwrap();
+                                        let (namespace, _) = split_full_name(d);
+                                        match api.create(namespace, &pp, &new).await {
                                             Ok(o) => {
                                                 info!("Created new secret: {}", full_name(&o));
                                                 // wait for it..
@@ -102,7 +103,22 @@ async fn main() -> anyhow::Result<()> {
                                             Err(e) => error!("Error {}", e),
                                         }
                                     }
-                                    Err(e) => error!("Error {}", e),
+                                    Err(_) => {
+                                        let pp = PostParams::default();
+                                        let new = new_secret(d, &y).unwrap();
+                                        let (namespace, _) = split_full_name(d);
+                                        match api.create(namespace, &pp, &new).await {
+                                            Ok(o) => {
+                                                info!("Created new secret: {}", full_name(&o));
+                                                // wait for it..
+                                                std::thread::sleep(
+                                                    std::time::Duration::from_millis(5_000),
+                                                );
+                                            }
+                                            Err(kube::Error::Api(ae)) => assert_eq!(ae.code, 409), // if you skipped delete, for instance
+                                            Err(e) => error!("{}", e),
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -114,10 +130,7 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn new_secret(
-    full_name: &str,
-    data: &std::collections::BTreeMap<String, ByteString>,
-) -> Result<Secret, Error> {
+fn new_secret(full_name: &str, secret: &Secret) -> Result<Secret, Error> {
     let (namespace, name) = split_full_name(full_name);
     let so: Secret = serde_json::from_value(json!({
         "apiVersion": "v1",
@@ -129,7 +142,8 @@ fn new_secret(
                 "meta.ectobit.com/managed-by": "bond",
             }
         },
-        "data": Some(data)
+        "type": secret.type_,
+        "data": secret.data
     }))?;
     Ok(so)
 }
@@ -146,18 +160,16 @@ fn split_full_name(s: &str) -> (&str, &str) {
 struct KubeApi<'a, T> {
     client: Client,
     lock: Arc<RwLock<HashMap<&'a str, Api<T>>>>,
-    cluster_api: Api<T>,
 }
 
 impl<'a, T> KubeApi<'a, T>
 where
-    T: Resource + Clone + DeserializeOwned + Meta + Serialize,
+    T: Resource + Clone + DeserializeOwned + Meta + Serialize + std::fmt::Debug,
 {
     fn new(client: Client) -> KubeApi<'a, T> {
         KubeApi {
             client: client.clone(),
             lock: Arc::new(RwLock::new(HashMap::with_capacity(1))),
-            cluster_api: Api::<T>::all(client),
         }
     }
 
@@ -168,15 +180,35 @@ where
         match map.get(namespace) {
             Some(api) => return api.get(name).await,
             None => {
+                drop(map);
+                let lock = Arc::clone(&self.lock);
                 let mut map = lock.write().unwrap();
                 let new_api = Api::<T>::namespaced(self.client.clone(), namespace);
                 let api = map.entry(namespace).or_insert(new_api);
-                api.get(name).await
+                return api.get(name).await;
             }
         }
     }
 
-    async fn create(&self, pp: &PostParams, data: &T) -> Result<T, kube::Error> {
-        self.cluster_api.create(pp, data).await
+    async fn create(
+        &self,
+        namespace: &'a str,
+        pp: &PostParams,
+        data: &T,
+    ) -> Result<T, kube::Error> {
+        info!("{} {:#?}", namespace, data);
+        let lock = Arc::clone(&self.lock);
+        let map = lock.write().unwrap();
+        match map.get(namespace) {
+            Some(api) => return api.create(pp, data).await,
+            None => {
+                drop(map);
+                let lock = Arc::clone(&self.lock);
+                let mut map = lock.write().unwrap();
+                let new_api = Api::<T>::namespaced(self.client.clone(), namespace);
+                let api = map.entry(namespace).or_insert(new_api);
+                return api.create(pp, data).await;
+            }
+        }
     }
 }
