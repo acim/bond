@@ -90,7 +90,7 @@ async fn main() -> anyhow::Result<()> {
                                         }
                                         let pp = PostParams::default();
                                         let new = new_secret(d, &s.data.unwrap()).unwrap();
-                                        match api.create(&d, &pp, &new).await {
+                                        match api.create(&pp, &new).await {
                                             Ok(o) => {
                                                 info!("Created new secret: {}", full_name(&o));
                                                 // wait for it..
@@ -146,6 +146,7 @@ fn split_full_name<'a>(s: &'a String) -> (&'a str, &'a str) {
 struct KubeApi<'a, T> {
     client: Client,
     namespaced_api: HashMap<&'a str, Api<T>>,
+    cluster_api: Api<T>,
 }
 
 impl<'a, T> KubeApi<'a, T>
@@ -154,8 +155,9 @@ where
 {
     fn new(client: Client) -> KubeApi<'a, T> {
         KubeApi {
-            client,
+            client: client.clone(),
             namespaced_api: HashMap::with_capacity(2),
+            cluster_api: Api::<T>::all(client),
         }
     }
 
@@ -168,16 +170,7 @@ where
         api.get(name).await
     }
 
-    async fn create(
-        &mut self,
-        namespace: &'a str,
-        pp: &PostParams,
-        data: &T,
-    ) -> Result<T, kube::Error> {
-        let api = self
-            .namespaced_api
-            .entry(namespace)
-            .or_insert(Api::<T>::namespaced(self.client.clone(), namespace));
-        api.create(pp, data).await
+    async fn create(&self, pp: &PostParams, data: &T) -> Result<T, kube::Error> {
+        self.cluster_api.create(pp, data).await
     }
 }
