@@ -138,7 +138,7 @@ fn full_name(s: &Secret) -> String {
 }
 
 fn split_full_name(s: &str) -> (&str, &str) {
-    let parts: Vec<&str> = s.split("/").collect();
+    let parts: Vec<&str> = s.split('/').collect();
     (parts[0], parts[1])
 }
 
