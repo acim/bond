@@ -137,7 +137,7 @@ fn full_name(s: &Secret) -> String {
     format!("{}/{}", Meta::namespace(s).unwrap(), Meta::name(s))
 }
 
-fn split_full_name<'a>(s: &'a str) -> (&'a str, &'a str) {
+fn split_full_name(s: &str) -> (&str, &str) {
     let parts: Vec<&str> = s.split("/").collect();
     (parts[0], parts[1])
 }
@@ -160,7 +160,7 @@ where
         }
     }
 
-    async fn get(&mut self, full_name: &'a String) -> Result<T, kube::Error> {
+    async fn get(&mut self, full_name: &'a str) -> Result<T, kube::Error> {
         let (namespace, name) = split_full_name(full_name);
         let api = self
             .namespaced_api
