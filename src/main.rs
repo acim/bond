@@ -58,50 +58,53 @@ async fn main() -> anyhow::Result<()> {
     let mut nss = Vec::with_capacity(cfg.replica.len());
     let lp = ListParams::default().allow_bookmarks();
     for sr in cfg.replica.iter() {
-        let parts: Vec<&str> = sr.source.split("/").collect();
-        assert_eq!(parts.len(), 2);
-        let a: Api<Secret> = Api::namespaced(client.clone(), parts[0]);
+        let (ns, _) = split_full_name(&sr.source);
+        let a: Api<Secret> = Api::namespaced(client.clone(), ns);
         nss.push(watcher(a, lp.clone()).boxed());
     }
-
-    let cms: Api<Secret> = Api::all(client);
 
     let mut w = stream::select_all(nss);
 
     // let mut w = watcher(cms, lp).boxed();
     while let Some(event) = w.try_next().await? {
         match event {
-            Applied(x) => info!("Applied: {:?}", x.metadata.name.as_ref().unwrap()),
-            Deleted(x) => info!("Deleted: {:?}", x.metadata.name.as_ref().unwrap()),
+            Applied(x) => info!("Applied: {}", full_name(&x)),
+            Deleted(x) => info!("Deleted: {}", full_name(&x)),
             Restarted(x) => {
                 for y in x.iter() {
-                    info!(
-                        "Restarted: {}/{}",
-                        y.metadata.namespace.as_ref().unwrap(),
-                        y.metadata.name.as_ref().unwrap()
-                    );
+                    info!("Restarted: {}", full_name(&y));
 
-                    if false {
-                        let ns = new_secret(
-                            y,
-                            y.metadata.namespace.as_ref().unwrap(),
-                            y.metadata.name.as_ref().unwrap(),
-                        )
-                        .unwrap();
-
-                        let pp = PostParams::default();
-                        match cms.create(&pp, &ns).await {
-                            Ok(o) => {
-                                let tns = Meta::namespace(&o);
-                                let tn = Meta::name(&o);
-                                assert_eq!(Meta::name(&ns), tn);
-                                assert_eq!(Meta::namespace(&ns), tns);
-                                info!("Applied new secret: {}/{}", tns.unwrap(), tn);
-                                // wait for it..
-                                std::thread::sleep(std::time::Duration::from_millis(5_000));
+                    for i in cfg.replica.iter() {
+                        if full_name(&y) == i.source {
+                            info!("Trying to find destination {}", &i.destination[0]);
+                            let (ns, n) = split_full_name(&i.destination[0]);
+                            let cms: Api<Secret> = Api::namespaced(client.clone(), ns);
+                            match cms.get(n).await {
+                                Ok(s) => {
+                                    info!("Found {}", full_name(&s));
+                                    if y.data == s.data {
+                                        info!("Exact data, nothing to do");
+                                        continue;
+                                    }
+                                    if let Ok(ns) =
+                                        new_secret(y, Meta::namespace(y).unwrap(), Meta::name(y))
+                                    {
+                                        let pp = PostParams::default();
+                                        match cms.create(&pp, &ns).await {
+                                            Ok(o) => {
+                                                info!("Applied new secret: {}", full_name(&o));
+                                                // wait for it..
+                                                std::thread::sleep(
+                                                    std::time::Duration::from_millis(5_000),
+                                                );
+                                            }
+                                            Err(kube::Error::Api(ae)) => assert_eq!(ae.code, 409), // if you skipped delete, for instance
+                                            Err(e) => error!("Error {}", e),
+                                        }
+                                    }
+                                }
+                                Err(e) => error!("Error {}", e),
                             }
-                            Err(kube::Error::Api(ae)) => assert_eq!(ae.code, 409), // if you skipped delete, for instance
-                            Err(_e) => {} //return Err(e.into()), // any other case is probably bad
                         }
                     }
                 }
@@ -111,7 +114,7 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn new_secret(_si: &Secret, ns: &str, n: &str) -> Result<Secret, Error> {
+fn new_secret(_si: &Secret, ns: String, n: String) -> Result<Secret, Error> {
     let so: Secret = serde_json::from_value(json!({
         "apiVersion": "v1",
         "kind": "Secret",
@@ -125,4 +128,13 @@ fn new_secret(_si: &Secret, ns: &str, n: &str) -> Result<Secret, Error> {
         "data": {}
     }))?;
     Ok(so)
+}
+
+fn full_name(s: &Secret) -> String {
+    format!("{}/{}", Meta::namespace(s).unwrap(), Meta::name(s))
+}
+
+fn split_full_name<'a>(s: &'a String) -> (&'a str, &'a str) {
+    let p: Vec<&str> = s.split("/").collect();
+    (p[0], p[1])
 }
