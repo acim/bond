@@ -20,6 +20,7 @@ use kube_runtime::{
 };
 use serde_derive::{Deserialize, Serialize};
 use serde_json::json;
+use std::collections::HashMap;
 use std::io::Error;
 
 /// Kubernetes secrets replication across namespaces
@@ -64,6 +65,7 @@ async fn main() -> anyhow::Result<()> {
     }
 
     let mut w = stream::select_all(nss);
+    let mut api = KubeApi::new(client);
 
     // let mut w = watcher(cms, lp).boxed();
     while let Some(event) = w.try_next().await? {
@@ -78,14 +80,14 @@ async fn main() -> anyhow::Result<()> {
                         if full_name(&y) == i.source {
                             for d in i.destination.iter() {
                                 info!("Getting destination secret {}", &d);
-                                match get(client.clone(), &d).await {
+                                match api.get(&d).await {
                                     Ok(s) => {
                                         info!("Found {}", full_name(&s));
                                         if y.data == s.data {
                                             info!("Exact data, nothing to do");
                                             continue;
                                         }
-                                        match create(client.clone(), &d, s.data).await {
+                                        match api.create(&d, s.data.unwrap()).await {
                                             Ok(o) => {
                                                 info!("Created new secret: {}", full_name(&o));
                                                 // wait for it..
@@ -109,28 +111,10 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn get(client: Client, full_name: &String) -> Result<Secret, kube::Error> {
-    let (ns, n) = split_full_name(full_name);
-    let secrets: Api<Secret> = Api::namespaced(client, ns);
-    secrets.get(n).await
-}
-
-async fn create(
-    client: Client,
-    full_name: &String,
-    data: Option<std::collections::BTreeMap<String, ByteString>>,
-) -> Result<Secret, kube::Error> {
-    let (ns, n) = split_full_name(full_name);
-    let secrets: Api<Secret> = Api::namespaced(client, ns);
-    let pp = PostParams::default();
-    let n = new_secret(ns, n, data).unwrap();
-    secrets.create(&pp, &n).await
-}
-
 fn new_secret(
     ns: &str,
     n: &str,
-    data: Option<std::collections::BTreeMap<String, ByteString>>,
+    data: std::collections::BTreeMap<String, ByteString>,
 ) -> Result<Secret, Error> {
     let so: Secret = serde_json::from_value(json!({
         "apiVersion": "v1",
@@ -154,4 +138,42 @@ fn full_name(s: &Secret) -> String {
 fn split_full_name<'a>(s: &'a String) -> (&'a str, &'a str) {
     let p: Vec<&str> = s.split("/").collect();
     (p[0], p[1])
+}
+
+struct KubeApi<'a> {
+    client: Client,
+    namespaced_api: HashMap<&'a str, Api<Secret>>,
+}
+
+impl<'a> KubeApi<'a> {
+    fn new(client: Client) -> KubeApi<'a> {
+        KubeApi {
+            client,
+            namespaced_api: HashMap::with_capacity(2),
+        }
+    }
+
+    async fn get(&mut self, full_name: &'a String) -> Result<Secret, kube::Error> {
+        let (ns, n) = split_full_name(full_name);
+        let api = self
+            .namespaced_api
+            .entry(ns)
+            .or_insert(Api::namespaced(self.client.clone(), ns));
+        api.get(n).await
+    }
+
+    async fn create(
+        &mut self,
+        full_name: &'a String,
+        data: std::collections::BTreeMap<String, ByteString>,
+    ) -> Result<Secret, kube::Error> {
+        let (ns, n) = split_full_name(full_name);
+        let api = self
+            .namespaced_api
+            .entry(ns)
+            .or_insert(Api::namespaced(self.client.clone(), ns));
+        let pp = PostParams::default();
+        let new = new_secret(ns, n, data).unwrap();
+        api.create(&pp, &new).await
+    }
 }
