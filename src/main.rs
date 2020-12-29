@@ -114,7 +114,7 @@ async fn main() -> anyhow::Result<()> {
 }
 
 fn new_secret(
-    full_name: &String,
+    full_name: &str,
     data: &std::collections::BTreeMap<String, ByteString>,
 ) -> Result<Secret, Error> {
     let (namespace, name) = split_full_name(full_name);
@@ -137,9 +137,9 @@ fn full_name(s: &Secret) -> String {
     format!("{}/{}", Meta::namespace(s).unwrap(), Meta::name(s))
 }
 
-fn split_full_name<'a>(s: &'a String) -> (&'a str, &'a str) {
-    let p: Vec<&str> = s.split("/").collect();
-    (p[0], p[1])
+fn split_full_name<'a>(s: &'a str) -> (&'a str, &'a str) {
+    let parts: Vec<&str> = s.split("/").collect();
+    (parts[0], parts[1])
 }
 
 struct KubeApi<'a, T> {
