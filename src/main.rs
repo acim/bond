@@ -18,8 +18,7 @@ use kube_runtime::{
     watcher,
     watcher::Event::{Applied, Deleted, Restarted},
 };
-use serde;
-use serde_derive::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
 use std::io::Error;
@@ -33,13 +32,13 @@ struct Opt {
     config: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, serde_derive::Serialize, serde_derive::Deserialize)]
 struct SecretReplica {
     source: String,
     destination: Vec<String>,
 }
 
-#[derive(Default, Debug, Serialize, Deserialize)]
+#[derive(Default, Debug, serde_derive::Serialize, serde_derive::Deserialize)]
 struct Config {
     replica: Vec<SecretReplica>,
 }
@@ -151,7 +150,7 @@ struct KubeApi<'a, T> {
 
 impl<'a, T> KubeApi<'a, T>
 where
-    T: Resource + Clone + serde::de::DeserializeOwned + Meta + serde::Serialize,
+    T: Resource + Clone + DeserializeOwned + Meta + Serialize,
 {
     fn new(client: Client) -> KubeApi<'a, T> {
         KubeApi {
