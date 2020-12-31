@@ -165,6 +165,7 @@ impl KubeApi {
         Self { client }
     }
 
+    /// Retrieve namespaced Kubernetes resource consuming full name.
     async fn get<T, U>(&mut self, full_name: U) -> Result<T, kube::Error>
     where
         T: Resource + Clone + DeserializeOwned + Meta + Serialize + std::fmt::Debug,
@@ -175,23 +176,25 @@ impl KubeApi {
         api.get(name).await
     }
 
+    /// Create namespaced Kubernetes resource consuming full name and resource.
     async fn create<T, U>(&self, full_name: U, data: &T) -> Result<T, kube::Error>
     where
         T: Resource + Clone + DeserializeOwned + Meta + Serialize + std::fmt::Debug,
         U: AsRef<str>,
     {
         let (namespace, _) = split_full_name(full_name.as_ref());
-        let api = Api::<T>::namespaced(self.client.clone(), namespace.as_ref());
+        let api = Api::<T>::namespaced(self.client.clone(), namespace);
         api.create(&PostParams::default(), data).await
     }
 
+    /// Delete namespaced Kubernetes resource consuming full name.
     async fn delete<T, U>(&self, full_name: U) -> Result<either::Either<T, Status>, kube::Error>
     where
         T: Resource + Clone + DeserializeOwned + Meta + Serialize + std::fmt::Debug,
         U: AsRef<str>,
     {
         let (namespace, name) = split_full_name(full_name.as_ref());
-        let api = Api::<T>::namespaced(self.client.clone(), namespace.as_ref());
+        let api = Api::<T>::namespaced(self.client.clone(), namespace);
         api.delete(name, &DeleteParams::default()).await
     }
 }
