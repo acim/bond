@@ -166,6 +166,7 @@ dependencies = [
  "anyhow",
  "clap",
  "confy",
+ "either",
  "env_logger 0.8.2",
  "futures",
  "k8s-openapi",

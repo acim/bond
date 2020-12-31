@@ -10,8 +10,9 @@ extern crate log;
 use clap::Clap;
 use futures::{stream, StreamExt, TryStreamExt};
 use k8s_openapi::{api::core::v1::Secret, Resource};
+use kube::client::Status;
 use kube::{
-    api::{Api, ListParams, Meta, PostParams},
+    api::{Api, DeleteParams, ListParams, Meta, PostParams},
     Client,
 };
 use kube_runtime::{
@@ -89,10 +90,8 @@ async fn main() -> anyhow::Result<()> {
                                             info!("Secret up to date");
                                             continue;
                                         }
-                                        let pp = PostParams::default();
                                         let new = new_secret(d, &s).unwrap();
-                                        let (namespace, _) = split_full_name(d);
-                                        match api.create(namespace, &pp, &new).await {
+                                        match api.create(d, &new).await {
                                             Ok(o) => {
                                                 info!("Created new secret: {}", full_name(&o));
                                                 // wait for it..
@@ -105,10 +104,8 @@ async fn main() -> anyhow::Result<()> {
                                         }
                                     }
                                     Err(_) => {
-                                        let pp = PostParams::default();
                                         let new = new_secret(d, &y).unwrap();
-                                        let (namespace, _) = split_full_name(d);
-                                        match api.create(namespace, &pp, &new).await {
+                                        match api.create(d, &new).await {
                                             Ok(o) => {
                                                 info!("Created new secret: {}", full_name(&o));
                                                 // wait for it..
@@ -162,6 +159,7 @@ struct KubeApi {
     client: Client,
 }
 
+#[allow(dead_code)]
 impl KubeApi {
     fn new(client: Client) -> Self {
         Self { client }
@@ -177,13 +175,24 @@ impl KubeApi {
         api.get(name).await
     }
 
-    async fn create<T, U>(&self, namespace: U, pp: &PostParams, data: &T) -> Result<T, kube::Error>
+    async fn create<T, U>(&self, full_name: U, data: &T) -> Result<T, kube::Error>
     where
         T: Resource + Clone + DeserializeOwned + Meta + Serialize + std::fmt::Debug,
         U: AsRef<str>,
     {
+        let (namespace, _) = split_full_name(full_name.as_ref());
         let api = Api::<T>::namespaced(self.client.clone(), namespace.as_ref());
-        api.create(pp, data).await
+        api.create(&PostParams::default(), data).await
+    }
+
+    async fn delete<T, U>(&self, full_name: U) -> Result<either::Either<T, Status>, kube::Error>
+    where
+        T: Resource + Clone + DeserializeOwned + Meta + Serialize + std::fmt::Debug,
+        U: AsRef<str>,
+    {
+        let (namespace, name) = split_full_name(full_name.as_ref());
+        let api = Api::<T>::namespaced(self.client.clone(), namespace.as_ref());
+        api.delete(name, &DeleteParams::default()).await
     }
 }
 
