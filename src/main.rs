@@ -23,6 +23,7 @@ use serde_json::json;
 use std::collections::HashMap;
 use std::io::Error;
 use std::sync::{Arc, RwLock};
+use warp::Filter;
 
 /// Kubernetes secrets replication across namespaces
 #[derive(Clap, Debug)]
@@ -54,6 +55,8 @@ async fn main() -> anyhow::Result<()> {
 
     let cfg: Config = confy::load(opt.config.as_str()).unwrap();
     info!("Config: {:#?}", cfg);
+
+    tokio::spawn(async { serve().await });
 
     let client = Client::try_default().await?;
 
@@ -166,8 +169,8 @@ impl<'a, T> KubeApi<'a, T>
 where
     T: Resource + Clone + DeserializeOwned + Meta + Serialize + std::fmt::Debug,
 {
-    fn new(client: Client) -> KubeApi<'a, T> {
-        KubeApi {
+    fn new(client: Client) -> Self {
+        Self {
             client,
             lock: Arc::new(RwLock::new(HashMap::with_capacity(1))),
         }
@@ -211,4 +214,10 @@ where
             }
         }
     }
+}
+
+async fn serve() {
+    let live = warp::path!("live").map(|| r#"{"status":"OK"}"#);
+
+    warp::serve(live).run(([127, 0, 0, 1], 3030)).await;
 }
