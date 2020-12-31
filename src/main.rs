@@ -184,6 +184,7 @@ where
             Some(api) => return api.get(name).await,
             None => {
                 drop(map);
+                drop(lock);
                 let lock = Arc::clone(&self.lock);
                 let mut map = lock.write().unwrap();
                 let new_api = Api::<T>::namespaced(self.client.clone(), namespace);
