@@ -20,9 +20,7 @@ use kube_runtime::{
 };
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::json;
-use std::collections::HashMap;
 use std::io::Error;
-use std::sync::{Arc, RwLock};
 use warp::Filter;
 
 /// Kubernetes secrets replication across namespaces
@@ -160,60 +158,32 @@ fn split_full_name(s: &str) -> (&str, &str) {
     (parts[0], parts[1])
 }
 
-struct KubeApi<'a, T> {
+struct KubeApi {
     client: Client,
-    lock: Arc<RwLock<HashMap<&'a str, Api<T>>>>,
 }
 
-impl<'a, T> KubeApi<'a, T>
-where
-    T: Resource + Clone + DeserializeOwned + Meta + Serialize + std::fmt::Debug,
-{
+impl KubeApi {
     fn new(client: Client) -> Self {
-        Self {
-            client,
-            lock: Arc::new(RwLock::new(HashMap::with_capacity(1))),
-        }
+        Self { client }
     }
 
-    async fn get(&mut self, full_name: &'a str) -> Result<T, kube::Error> {
-        let (namespace, name) = split_full_name(full_name);
-        let lock = Arc::clone(&self.lock);
-        let map = lock.read().unwrap();
-        match map.get(namespace) {
-            Some(api) => return api.get(name).await,
-            None => {
-                drop(map);
-                drop(lock);
-                let lock = Arc::clone(&self.lock);
-                let mut map = lock.write().unwrap();
-                let new_api = Api::<T>::namespaced(self.client.clone(), namespace);
-                let api = map.entry(namespace).or_insert(new_api);
-                return api.get(name).await;
-            }
-        }
+    async fn get<T, U>(&mut self, full_name: U) -> Result<T, kube::Error>
+    where
+        T: Resource + Clone + DeserializeOwned + Meta + Serialize + std::fmt::Debug,
+        U: AsRef<str>,
+    {
+        let (namespace, name) = split_full_name(full_name.as_ref());
+        let api = Api::<T>::namespaced(self.client.clone(), namespace);
+        api.get(name).await
     }
 
-    async fn create(
-        &self,
-        namespace: &'a str,
-        pp: &PostParams,
-        data: &T,
-    ) -> Result<T, kube::Error> {
-        info!("{} {:#?}", namespace, data);
-        let lock = Arc::clone(&self.lock);
-        let map = lock.write().unwrap();
-        match map.get(namespace) {
-            Some(api) => return api.create(pp, data).await,
-            None => {
-                drop(map);
-                let lock = Arc::clone(&self.lock);
-                let mut map = lock.write().unwrap();
-                let new_api = Api::<T>::namespaced(self.client.clone(), namespace);
-                let api = map.entry(namespace).or_insert(new_api);
-                return api.create(pp, data).await;
-            }
-        }
+    async fn create<T, U>(&self, namespace: U, pp: &PostParams, data: &T) -> Result<T, kube::Error>
+    where
+        T: Resource + Clone + DeserializeOwned + Meta + Serialize + std::fmt::Debug,
+        U: AsRef<str>,
+    {
+        let api = Api::<T>::namespaced(self.client.clone(), namespace.as_ref());
+        api.create(pp, data).await
     }
 }
 
