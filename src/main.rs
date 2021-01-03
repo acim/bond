@@ -6,7 +6,7 @@
 // copied, modified, or distributed except according to those terms.
 
 //!
-#![warn(missing_debug_implementations, rust-2018-idioms, missing-docs)]
+#![warn(missing_debug_implementations, rust_2018_idioms, missing_docs)]
 
 #[macro_use]
 extern crate log;
