@@ -27,6 +27,8 @@ use serde_json::json;
 use std::io::Error;
 use warp::Filter;
 
+const LABEL: &str = "app.kubernetes.io/managed-by";
+
 /// Kubernetes secrets replication across namespaces
 #[derive(Clap, Debug)]
 #[clap(name = "bond")]
@@ -139,14 +141,25 @@ fn new_secret(full_name: &str, secret: &Secret) -> Result<Secret, Error> {
         "metadata": {
             "name": name,
             "namespace": namespace,
-            "annotations": {
-                "meta.ectobit.com/managed-by": "bond",
+            "labels": {
+                LABEL: "bond",
             }
         },
         "type": secret.type_,
         "data": secret.data
     }))?;
     Ok(so)
+}
+
+#[test]
+fn it_works() {
+    let mut s: Secret = Default::default();
+    let mut a = std::collections::BTreeMap::<String, String>::new();
+    a.insert(LABEL.to_string(), "bond".to_string());
+    s.metadata.name = Some("bar".to_string());
+    s.metadata.namespace = Some("foo".to_string());
+    s.metadata.labels = Some(a);
+    assert_eq!(s, new_secret("foo/bar", &s).unwrap())
 }
 
 fn full_name(s: &Secret) -> String {
