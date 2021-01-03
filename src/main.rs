@@ -5,6 +5,9 @@
 // http://opensource.org/licenses/MIT>, at your option. This file may not be
 // copied, modified, or distributed except according to those terms.
 
+//!
+#![warn(missing_debug_implementations, rust-2018-idioms, missing-docs)]
+
 #[macro_use]
 extern crate log;
 use clap::Clap;
