@@ -12,20 +12,20 @@
 extern crate log;
 use clap::Clap;
 use futures::{stream, StreamExt, TryStreamExt};
-use k8s_openapi::{api::core::v1::Secret, Resource};
-use kube::client::Status;
+use k8s_openapi::api::core::v1::Secret;
 use kube::{
-    api::{Api, DeleteParams, ListParams, Meta, PostParams},
+    api::{Api, ListParams},
     Client,
 };
 use kube_runtime::{
     watcher,
     watcher::Event::{Applied, Deleted, Restarted},
 };
-use serde::{de::DeserializeOwned, Serialize};
 use serde_json::json;
 use std::io::Error;
 use warp::Filter;
+
+mod client;
 
 const LABEL: &str = "app.kubernetes.io/managed-by";
 
@@ -67,30 +67,30 @@ async fn main() -> anyhow::Result<()> {
     let mut nss = Vec::with_capacity(cfg.replica.len());
     let lp = ListParams::default().allow_bookmarks();
     for sr in cfg.replica.iter() {
-        let (ns, _) = split_full_name(&sr.source);
+        let (ns, _) = client::split_full_name(&sr.source);
         let a: Api<Secret> = Api::namespaced(client.clone(), ns);
         nss.push(watcher(a, lp.clone()).boxed());
     }
 
     let mut w = stream::select_all(nss);
-    let mut api = KubeApi::new(client);
+    let mut api = client::KubeApi::new(client);
 
     // let mut w = watcher(cms, lp).boxed();
     while let Some(event) = w.try_next().await? {
         match event {
-            Applied(x) => info!("Applied: {}", full_name(&x)),
-            Deleted(x) => info!("Deleted: {}", full_name(&x)),
+            Applied(x) => info!("Applied: {}", client::full_name(&x)),
+            Deleted(x) => info!("Deleted: {}", client::full_name(&x)),
             Restarted(x) => {
                 for y in x.iter() {
-                    info!("Restarted: {}", full_name(&y));
+                    info!("Restarted: {}", client::full_name(&y));
 
                     for i in cfg.replica.iter() {
-                        if full_name(&y) == i.source {
+                        if client::full_name(&y) == i.source {
                             for d in i.destination.iter() {
                                 info!("Getting destination secret {}", &d);
                                 match api.get(&d).await {
                                     Ok(s) => {
-                                        info!("Found {}", full_name(&s));
+                                        info!("Found {}", client::full_name(&s));
                                         if y.data == s.data {
                                             info!("Secret up to date");
                                             continue;
@@ -98,7 +98,10 @@ async fn main() -> anyhow::Result<()> {
                                         let new = new_secret(d, &s).unwrap();
                                         match api.create(d, &new).await {
                                             Ok(o) => {
-                                                info!("Created new secret: {}", full_name(&o));
+                                                info!(
+                                                    "Created new secret: {}",
+                                                    client::full_name(&o)
+                                                );
                                                 // wait for it..
                                                 std::thread::sleep(
                                                     std::time::Duration::from_millis(5_000),
@@ -112,7 +115,10 @@ async fn main() -> anyhow::Result<()> {
                                         let new = new_secret(d, &y).unwrap();
                                         match api.create(d, &new).await {
                                             Ok(o) => {
-                                                info!("Created new secret: {}", full_name(&o));
+                                                info!(
+                                                    "Created new secret: {}",
+                                                    client::full_name(&o)
+                                                );
                                                 // wait for it..
                                                 std::thread::sleep(
                                                     std::time::Duration::from_millis(5_000),
@@ -134,7 +140,7 @@ async fn main() -> anyhow::Result<()> {
 }
 
 fn new_secret(full_name: &str, secret: &Secret) -> Result<Secret, Error> {
-    let (namespace, name) = split_full_name(full_name);
+    let (namespace, name) = client::split_full_name(full_name);
     let so: Secret = serde_json::from_value(json!({
         "apiVersion": "v1",
         "kind": "Secret",
@@ -151,6 +157,12 @@ fn new_secret(full_name: &str, secret: &Secret) -> Result<Secret, Error> {
     Ok(so)
 }
 
+async fn serve() {
+    let live = warp::path!("live").map(|| r#"{"status":"OK"}"#);
+
+    warp::serve(live).run(([127, 0, 0, 1], 3030)).await;
+}
+
 #[test]
 fn it_works() {
     let mut s: Secret = Default::default();
@@ -160,63 +172,4 @@ fn it_works() {
     s.metadata.namespace = Some("foo".to_string());
     s.metadata.labels = Some(a);
     assert_eq!(s, new_secret("foo/bar", &s).unwrap())
-}
-
-fn full_name(s: &Secret) -> String {
-    format!("{}/{}", Meta::namespace(s).unwrap(), Meta::name(s))
-}
-
-fn split_full_name(s: &str) -> (&str, &str) {
-    let parts: Vec<&str> = s.split('/').collect();
-    (parts[0], parts[1])
-}
-
-struct KubeApi {
-    client: Client,
-}
-
-#[allow(dead_code)]
-impl KubeApi {
-    fn new(client: Client) -> Self {
-        Self { client }
-    }
-
-    /// Retrieve namespaced Kubernetes resource consuming full name.
-    async fn get<T, U>(&mut self, full_name: U) -> Result<T, kube::Error>
-    where
-        T: Resource + Clone + DeserializeOwned + Meta + Serialize + std::fmt::Debug,
-        U: AsRef<str>,
-    {
-        let (namespace, name) = split_full_name(full_name.as_ref());
-        let api = Api::<T>::namespaced(self.client.clone(), namespace);
-        api.get(name).await
-    }
-
-    /// Create namespaced Kubernetes resource consuming full name and resource.
-    async fn create<T, U>(&self, full_name: U, data: &T) -> Result<T, kube::Error>
-    where
-        T: Resource + Clone + DeserializeOwned + Meta + Serialize + std::fmt::Debug,
-        U: AsRef<str>,
-    {
-        let (namespace, _) = split_full_name(full_name.as_ref());
-        let api = Api::<T>::namespaced(self.client.clone(), namespace);
-        api.create(&PostParams::default(), data).await
-    }
-
-    /// Delete namespaced Kubernetes resource consuming full name.
-    async fn delete<T, U>(&self, full_name: U) -> Result<either::Either<T, Status>, kube::Error>
-    where
-        T: Resource + Clone + DeserializeOwned + Meta + Serialize + std::fmt::Debug,
-        U: AsRef<str>,
-    {
-        let (namespace, name) = split_full_name(full_name.as_ref());
-        let api = Api::<T>::namespaced(self.client.clone(), namespace);
-        api.delete(name, &DeleteParams::default()).await
-    }
-}
-
-async fn serve() {
-    let live = warp::path!("live").map(|| r#"{"status":"OK"}"#);
-
-    warp::serve(live).run(([127, 0, 0, 1], 3030)).await;
 }
