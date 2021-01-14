@@ -57,7 +57,7 @@ async fn main() -> anyhow::Result<()> {
     let opt: &Opt = &Opt::parse();
     info!("Options: {:#?}", opt);
 
-    let cfg: Config = confy::load(opt.config.as_str()).unwrap();
+    let cfg: Config = confy::load(opt.config.as_str(), None).unwrap();
     info!("Config: {:#?}", cfg);
 
     tokio::spawn(async { serve().await });
