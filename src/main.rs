@@ -15,7 +15,7 @@ use kube::{
 };
 use kube_runtime::controller::{Context, Controller, ReconcilerAction};
 // use serde::{Deserialize, Serialize};
-// use std::collections::BTreeMap;
+use std::collections::BTreeMap;
 use std::fmt;
 use tokio::time::Duration;
 
@@ -34,57 +34,57 @@ impl std::error::Error for MyError {
     }
 }
 
-// fn object_to_owner_reference<K: Meta>(meta: ObjectMeta) -> Result<OwnerReference, Error> {
-//     Ok(OwnerReference {
-//         api_version: K::API_VERSION.to_string(),
-//         kind: K::KIND.to_string(),
-//         name: meta.name.context(MissingObjectKey {
-//             name: ".metadata.name",
-//         })?,
-//         uid: meta.uid.context(MissingObjectKey {
-//             name: ".metadata.backtrace",
-//         })?,
-//         ..OwnerReference::default()
-//     })
-// }
+fn object_to_owner_reference<K: Meta>(meta: ObjectMeta) -> Result<OwnerReference, Error> {
+    Ok(OwnerReference {
+        api_version: K::API_VERSION.to_string(),
+        kind: K::KIND.to_string(),
+        // name: meta.name.context(MissingObjectKey {
+        //     name: ".metadata.name",
+        // })?,
+        // uid: meta.uid.context(MissingObjectKey {
+        //     name: ".metadata.backtrace",
+        // })?,
+        ..OwnerReference::default()
+    })
+}
 
 /// Controller triggers this whenever our main object or our children changed
 async fn reconcile(generator: Secret, ctx: Context<Data>) -> Result<ReconcilerAction, MyError> {
-    // let client = ctx.get_ref().client.clone();
+    let client = ctx.get_ref().client.clone();
 
-    // let mut contents = BTreeMap::new();
-    // contents.insert("content".to_string(), generator.data);
-    // let cm = Secret {
-    //     metadata: ObjectMeta {
-    //         name: generator.metadata.name.clone(),
-    //         owner_references: Some(vec![OwnerReference {
-    //             controller: Some(true),
-    //             ..object_to_owner_reference::<Secret>(generator.metadata.clone())?
-    //         }]),
-    //         ..ObjectMeta::default()
-    //     },
-    //     data: Some(contents),
-    //     ..Default::default()
-    // };
-    // let cm_api = Api::<Secret>::namespaced(
-    //     client.clone(),
-    //     generator
-    //         .metadata
-    //         .namespace
-    //         .as_ref()
-    //         .context(MissingObjectKey {
-    //             name: ".metadata.namespace",
-    //         })?,
-    // );
-    // cm_api
-    //     .patch(
-    //         cm.metadata.name.as_ref()..context(MissingObjectKey {
-    //             name: ".metadata.name",
-    //         })?,
-    //         &PatchParams::apply("configmapgenerator.kube-rt.nullable.se"),
-    //         &Patch::Apply(&cm),
-    //     )
-    //     .await?;
+    let mut contents = BTreeMap::new();
+    contents.insert("content".to_string(), generator.data);
+    let cm = Secret {
+        metadata: ObjectMeta {
+            name: generator.metadata.name.clone(),
+            owner_references: Some(vec![OwnerReference {
+                controller: Some(true),
+                ..object_to_owner_reference::<Secret>(generator.metadata.clone())?
+            }]),
+            ..ObjectMeta::default()
+        },
+        // data: Some(contents),
+        ..Default::default()
+    };
+    let cm_api = Api::<Secret>::namespaced(
+        client.clone(),
+        generator
+            .metadata
+            .namespace
+            .as_ref()
+            .context(MissingObjectKey {
+                name: ".metadata.namespace",
+            })?,
+    );
+    cm_api
+        .patch(
+            cm.metadata.name.as_ref()..context(MissingObjectKey {
+                name: ".metadata.name",
+            })?,
+            &PatchParams::apply("configmapgenerator.kube-rt.nullable.se"),
+            &Patch::Apply(&cm),
+        )
+        .await?;
     Ok(ReconcilerAction {
         requeue_after: Some(Duration::from_secs(300)),
     })
