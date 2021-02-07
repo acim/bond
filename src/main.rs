@@ -10,6 +10,7 @@
 
 #[macro_use]
 extern crate log;
+
 use clap::Clap;
 use futures::{stream, StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::Secret;
@@ -33,14 +34,14 @@ mod client;
 #[derive(Clap, Debug)]
 #[clap(name = "bond")]
 struct Opt {
-    #[clap(short, long, default_value = "80")]
+    #[clap(short, long, default_value = "3000")]
     port: u16,
 }
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     std::env::set_var("RUST_LOG", "info,kube=debug");
-    env_logger::init();
+    json_env_logger::init();
 
     let opt = &Opt::parse();
     info!("Options: {:#?}", opt);
