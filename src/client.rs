@@ -1,7 +1,7 @@
 use k8s_openapi::{api::core::v1::Secret, Resource};
-use kube::client::Status;
+// use kube::client::Status;
 use kube::{
-    api::{Api, DeleteParams, Meta, PostParams},
+    api::{Api, ListParams, Meta, PostParams}, // DeleteParams
     Client,
 };
 use serde::{de::DeserializeOwned, Serialize};
@@ -48,6 +48,26 @@ impl KubeApi {
     //     let api = Api::<T>::namespaced(self.client.clone(), namespace);
     //     api.delete(name, &DeleteParams::default()).await
     // }
+
+    pub async fn is_crd_installed<T>(&self, field_selector: &str) -> bool
+    where
+        T: Resource + Clone + DeserializeOwned + Meta,
+    {
+        let crd: Api<T> = Api::<T>::all(self.client.clone());
+
+        let mut lp = ListParams::default().timeout(20);
+        if field_selector.len() > 0 {
+            lp = lp.fields(field_selector);
+        }
+
+        match crd.list(&lp).await {
+            Ok(crds) => crds.into_iter().len() > 0,
+            Err(e) => {
+                error!("failed checking crd: {}", e);
+                false
+            }
+        }
+    }
 }
 
 pub fn full_name(s: &Secret) -> String {

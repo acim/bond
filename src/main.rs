@@ -24,6 +24,7 @@ use kube_runtime::{
 };
 // use serde_json::json;
 // use std::io::Error;
+use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
 use warp::Filter;
 
 mod client;
@@ -44,7 +45,7 @@ async fn main() -> anyhow::Result<()> {
     json_env_logger::init();
 
     let opt = &Opt::parse();
-    info!("Options: {:#?}", opt);
+    info!("Options: {:?}", opt);
 
     // Run health service
     let port = opt.port;
@@ -58,7 +59,13 @@ async fn main() -> anyhow::Result<()> {
     nss.push(watcher(a, lp.clone()).boxed());
 
     let mut w = stream::select_all(nss);
-    // let mut api = client::KubeApi::new(client);
+    let api = client::KubeApi::new(client);
+    if api
+        .is_crd_installed::<CustomResourceDefinition>("metadata.name=certificates.cert-manager.io")
+        .await
+    {
+        info!("found crd certificates.cert-manager.io")
+    }
 
     while let Some(event) = w.try_next().await? {
         match event {
