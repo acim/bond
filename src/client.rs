@@ -49,6 +49,13 @@ impl KubeApi {
     //     api.delete(name, &DeleteParams::default()).await
     // }
 
+    /// Check if custom resource definition installed on Kubernetes cluster.
+    // ```rust
+    //     let api = client::KubeApi::new(client);
+    //     if api.is_crd_installed::<CustomResourceDefinition>("metadata.name=certificates.cert-manager.io").await {
+    //         info!("found crd certificates.cert-manager.io")
+    //     }
+    //
     pub async fn is_crd_installed<T>(&self, field_selector: &str) -> bool
     where
         T: Resource + Clone + DeserializeOwned + Meta,
@@ -61,7 +68,10 @@ impl KubeApi {
         }
 
         match crd.list(&lp).await {
-            Ok(crds) => crds.into_iter().len() > 0,
+            Ok(crds) => {
+                info!("found crd with field {}", field_selector);
+                crds.into_iter().len() > 0
+            }
             Err(e) => {
                 error!("failed checking crd: {}", e);
                 false

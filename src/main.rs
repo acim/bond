@@ -45,7 +45,7 @@ async fn main() -> anyhow::Result<()> {
     json_env_logger::init();
 
     let opt = &Opt::parse();
-    info!("Options: {:?}", opt);
+    info!("options: {:?}", opt);
 
     // Run health service
     let port = opt.port;
