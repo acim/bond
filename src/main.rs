@@ -15,12 +15,13 @@ use clap::Clap;
 use futures::{stream, StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::Secret;
 use kube::{
-    api::{Api, ListParams},
+    api::{Api, ListParams, Meta},
     Client,
 };
 use kube_runtime::{
+    utils::try_flatten_applied,
     watcher,
-    watcher::Event::{Applied, Deleted, Restarted},
+    // watcher::Event::{Applied, Deleted, Restarted},
 };
 // use serde_json::json;
 // use std::io::Error;
@@ -28,6 +29,7 @@ use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomRe
 use warp::Filter;
 
 mod client;
+mod crd;
 
 // const LABEL: &str = "app.kubernetes.io/managed-by";
 
@@ -53,78 +55,88 @@ async fn main() -> anyhow::Result<()> {
 
     let client = Client::try_default().await?;
 
-    let mut nss = Vec::with_capacity(1);
-    let lp = ListParams::default().allow_bookmarks();
-    let a: Api<Secret> = Api::namespaced(client.clone(), "default");
-    nss.push(watcher(a, lp.clone()).boxed());
+    let api = client::KubeApi::new(client.clone());
 
-    let mut w = stream::select_all(nss);
-    let api = client::KubeApi::new(client);
+    let secrets: Api<Secret> = Api::namespaced(client.clone(), "default");
+    let secrets_watcher = watcher(secrets, ListParams::default().labels("owner!=helm"));
+
+    let mut combo_stream = stream::select_all(vec![try_flatten_applied(secrets_watcher)
+        .map_ok(Watched::Secret)
+        .boxed()]);
+
     if api
         .is_crd_installed::<CustomResourceDefinition>("metadata.name=certificates.cert-manager.io")
         .await
     {
-        info!("found crd certificates.cert-manager.io")
+        let certs: Api<crd::Certificate> = Api::namespaced(client, "default");
+        let certs_watcher = watcher(certs, ListParams::default());
+        combo_stream.push(
+            try_flatten_applied(certs_watcher)
+                .map_ok(Watched::Certificate)
+                .boxed(),
+        )
     }
 
-    while let Some(event) = w.try_next().await? {
+    while let Some(event) = combo_stream.try_next().await? {
         match event {
-            Applied(x) => info!("Applied: {}", client::full_name(&x)),
-            Deleted(x) => info!("Deleted: {}", client::full_name(&x)),
-            Restarted(x) => {
-                for y in x.iter() {
-                    info!("Restarted: {}", client::full_name(&y));
+            Watched::Secret(s) => info!("Got secret: {}", Meta::name(&s)),
+            Watched::Certificate(c) => info!("Got certificate: {}", Meta::name(&c)),
+            // Applied(x) => info!("Applied: {}", client::full_name(&x)),
+            // Deleted(x) => info!("Deleted: {}", client::full_name(&x)),
+            // Restarted(x) => {
+            //     for y in x.iter() {
+            //         info!("Restarted: {}", client::full_name(&y));
 
-                    // for i in cfg.replica.iter() {
-                    //     if client::full_name(&y) == i.source {
-                    //         for d in i.destination.iter() {
-                    //             info!("Getting destination secret {}", &d);
-                    //             match api.get(&d).await {
-                    //                 Ok(s) => {
-                    //                     info!("Found {}", client::full_name(&s));
-                    //                     if y.data == s.data {
-                    //                         info!("Secret up to date");
-                    //                         continue;
-                    //                     }
-                    //                     let new = new_secret(d, &s).unwrap();
-                    //                     match api.create(d, &new).await {
-                    //                         Ok(o) => {
-                    //                             info!(
-                    //                                 "Created new secret: {}",
-                    //                                 client::full_name(&o)
-                    //                             );
-                    //                             // wait for it..
-                    //                             std::thread::sleep(
-                    //                                 std::time::Duration::from_millis(5_000),
-                    //                             );
-                    //                         }
-                    //                         Err(kube::Error::Api(ae)) => assert_eq!(ae.code, 409), // if you skipped delete, for instance
-                    //                         Err(e) => error!("Error {}", e),
-                    //                     }
-                    //                 }
-                    //                 Err(_) => {
-                    //                     let new = new_secret(d, &y).unwrap();
-                    //                     match api.create(d, &new).await {
-                    //                         Ok(o) => {
-                    //                             info!(
-                    //                                 "Created new secret: {}",
-                    //                                 client::full_name(&o)
-                    //                             );
-                    //                             // wait for it..
-                    //                             std::thread::sleep(
-                    //                                 std::time::Duration::from_millis(5_000),
-                    //                             );
-                    //                         }
-                    //                         Err(kube::Error::Api(ae)) => assert_eq!(ae.code, 409), // if you skipped delete, for instance
-                    //                         Err(e) => error!("{}", e),
-                    //                     }
-                    //                 }
-                    //             }
-                    //         }
-                    //     }
-                    // }
-                }
-            }
+            //         for i in cfg.replica.iter() {
+            //             if client::full_name(&y) == i.source {
+            //                 for d in i.destination.iter() {
+            //                     info!("Getting destination secret {}", &d);
+            //                     match api.get(&d).await {
+            //                         Ok(s) => {
+            //                             info!("Found {}", client::full_name(&s));
+            //                             if y.data == s.data {
+            //                                 info!("Secret up to date");
+            //                                 continue;
+            //                             }
+            //                             let new = new_secret(d, &s).unwrap();
+            //                             match api.create(d, &new).await {
+            //                                 Ok(o) => {
+            //                                     info!(
+            //                                         "Created new secret: {}",
+            //                                         client::full_name(&o)
+            //                                     );
+            //                                     // wait for it..
+            //                                     std::thread::sleep(
+            //                                         std::time::Duration::from_millis(5_000),
+            //                                     );
+            //                                 }
+            //                                 Err(kube::Error::Api(ae)) => assert_eq!(ae.code, 409), // if you skipped delete, for instance
+            //                                 Err(e) => error!("Error {}", e),
+            //                             }
+            //                         }
+            //                         Err(_) => {
+            //                             let new = new_secret(d, &y).unwrap();
+            //                             match api.create(d, &new).await {
+            //                                 Ok(o) => {
+            //                                     info!(
+            //                                         "Created new secret: {}",
+            //                                         client::full_name(&o)
+            //                                     );
+            //                                     // wait for it..
+            //                                     std::thread::sleep(
+            //                                         std::time::Duration::from_millis(5_000),
+            //                                     );
+            //                                 }
+            //                                 Err(kube::Error::Api(ae)) => assert_eq!(ae.code, 409), // if you skipped delete, for instance
+            //                                 Err(e) => error!("{}", e),
+            //                             }
+            //                         }
+            //                     }
+            //                 }
+            //             }
+            //         }
+            //     }
+            // }
         }
     }
     Ok(())
@@ -164,3 +176,8 @@ async fn serve(port: u16) {
 //     s.metadata.labels = Some(a);
 //     assert_eq!(s, new_secret("foo/bar", &s).unwrap())
 // }
+
+enum Watched {
+    Secret(Secret),
+    Certificate(crd::Certificate),
+}
