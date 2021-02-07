@@ -144,7 +144,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
- "confy",
  "env_logger 0.8.2",
  "failure",
  "futures",
@@ -252,16 +251,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "confy"
-version = "0.4.0"
-source = "git+https://github.com/rust-cli/confy#0f0c452d652e85674348d9ad6e54bbdebbbd848a"
-dependencies = [
- "directories-next",
- "serde",
- "serde_yaml",
-]
-
-[[package]]
 name = "const_fn"
 version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -335,16 +324,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3dd60d1080a57a05ab032377049e0591415d2b31afd7028356dbf3cc6dcb066"
 dependencies = [
  "generic-array 0.14.4",
-]
-
-[[package]]
-name = "directories-next"
-version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "339ee130d97a610ea5a5872d2bbb130fdf68884ff09d3028b81bec8a1ac23bbc"
-dependencies = [
- "cfg-if",
- "dirs-sys-next",
 ]
 
 [[package]]

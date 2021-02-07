@@ -38,16 +38,16 @@ impl KubeApi {
         api.create(&PostParams::default(), data).await
     }
 
-    /// Delete namespaced Kubernetes resource consuming full name.
-    pub async fn delete<T, U>(&self, full_name: U) -> Result<either::Either<T, Status>, kube::Error>
-    where
-        T: Resource + Clone + DeserializeOwned + Meta + Serialize + std::fmt::Debug,
-        U: AsRef<str>,
-    {
-        let (namespace, name) = split_full_name(full_name.as_ref());
-        let api = Api::<T>::namespaced(self.client.clone(), namespace);
-        api.delete(name, &DeleteParams::default()).await
-    }
+    // Delete namespaced Kubernetes resource consuming full name.
+    // pub async fn delete<T, U>(&self, full_name: U) -> Result<either::Either<T, Status>, kube::Error>
+    // where
+    //     T: Resource + Clone + DeserializeOwned + Meta + Serialize + std::fmt::Debug,
+    //     U: AsRef<str>,
+    // {
+    //     let (namespace, name) = split_full_name(full_name.as_ref());
+    //     let api = Api::<T>::namespaced(self.client.clone(), namespace);
+    //     api.delete(name, &DeleteParams::default()).await
+    // }
 }
 
 pub fn full_name(s: &Secret) -> String {
