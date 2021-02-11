@@ -124,7 +124,7 @@ dependencies = [
  "futures",
  "json_env_logger",
  "k8s-openapi",
- "kube",
+ "kube 0.48.0",
  "kube-runtime",
  "log",
  "schemars",
@@ -702,6 +702,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "hyper-timeout"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bbb958482e8c7be4bc3cf272a766a2b0bf1a6755e7a6ae777f017a31d11b13b1"
+dependencies = [
+ "hyper",
+ "pin-project-lite",
+ "tokio",
+ "tokio-io-timeout",
+]
+
+[[package]]
 name = "hyper-tls"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -847,6 +859,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "kube"
+version = "0.50.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "459b1593a538fd0bb77e7133fdd3158c55e183affd0926337fa873986a741e0b"
+dependencies = [
+ "Inflector",
+ "base64",
+ "bytes",
+ "chrono",
+ "dirs-next",
+ "either",
+ "futures",
+ "http",
+ "hyper",
+ "hyper-timeout",
+ "jsonpath_lib",
+ "k8s-openapi",
+ "log",
+ "pem",
+ "pin-project 1.0.5",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "static_assertions",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "tower",
+ "url",
+]
+
+[[package]]
 name = "kube-derive"
 version = "0.48.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -861,15 +905,15 @@ dependencies = [
 
 [[package]]
 name = "kube-runtime"
-version = "0.48.0"
+version = "0.50.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4eff8e169f7ce8b9d76edcf7dc546403c09391ea74081a9ebc4388597fc8f333"
+checksum = "7105faa58a927b1ae6cf75fbbde123a1790fbff8bb7866928db4569d5e7cbeb4"
 dependencies = [
  "dashmap",
  "derivative",
  "futures",
  "k8s-openapi",
- "kube",
+ "kube 0.50.0",
  "pin-project 1.0.5",
  "serde",
  "smallvec",
@@ -1955,6 +1999,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "tokio-io-timeout"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "90c49f106be240de154571dd31fbe48acb10ba6c6dd6f6517ad603abffa42de9"
+dependencies = [
+ "pin-project-lite",
+ "tokio",
+]
+
+[[package]]
 name = "tokio-macros"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2015,6 +2069,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "tower"
+version = "0.4.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "713c629c07a3a97f741c140e474e7304294fabec66a43a33f0832e98315ab07f"
+dependencies = [
+ "futures-core",
+ "futures-util",
+ "pin-project 1.0.5",
+ "tokio",
+ "tokio-util",
+ "tower-layer",
+ "tower-service",
+ "tracing",
+]
+
+[[package]]
+name = "tower-layer"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "343bc9466d3fe6b0f960ef45960509f84480bf4fd96f92901afe7ff3df9d3a62"
+
+[[package]]
 name = "tower-service"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2029,7 +2105,19 @@ dependencies = [
  "cfg-if 1.0.0",
  "log",
  "pin-project-lite",
+ "tracing-attributes",
  "tracing-core",
+]
+
+[[package]]
+name = "tracing-attributes"
+version = "0.1.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "43f080ea7e4107844ef4766459426fa2d5c1ada2e47edba05dc7fa99d9629f47"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
