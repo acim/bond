@@ -64,7 +64,7 @@ impl KubeApi {
         let crd: Api<T> = Api::<T>::all(self.client.clone());
 
         let mut lp = ListParams::default().timeout(20);
-        if field_selector.len() > 0 {
+        if field_selector.empty() {
             lp = lp.fields(field_selector);
         }
 
