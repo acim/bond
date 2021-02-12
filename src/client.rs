@@ -1,4 +1,5 @@
-use k8s_openapi::{api::core::v1::Secret, Resource};
+use k8s_openapi::Resource;
+// use k8s_openapi::{api::core::v1::Secret, Resource};
 // use kube::client::Status;
 use kube::{
     api::{Api, ListParams, Meta, PostParams}, // DeleteParams
@@ -80,9 +81,9 @@ impl KubeApi {
     }
 }
 
-pub fn full_name(s: &Secret) -> String {
-    format!("{}/{}", Meta::namespace(s).unwrap(), Meta::name(s))
-}
+// pub fn full_name(s: &Secret) -> String {
+//     format!("{}/{}", Meta::namespace(s).unwrap(), Meta::name(s))
+// }
 
 pub fn split_full_name(s: &str) -> (&str, &str) {
     let parts: Vec<&str> = s.split('/').collect();

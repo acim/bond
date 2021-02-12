@@ -1,8 +1,9 @@
-use kube::{
-    api::{Api, ListParams, Meta},
-    Client, CustomResource,
-};
-use kube_runtime::{reflector, utils::try_flatten_applied, watcher};
+use kube::CustomResource;
+// use kube::{
+//     api::{Api, ListParams, Meta},
+//     Client, CustomResource,
+// };
+// use kube_runtime::{reflector, utils::try_flatten_applied, watcher};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
