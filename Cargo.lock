@@ -99,7 +99,7 @@ dependencies = [
  "futures",
  "json_env_logger",
  "k8s-openapi",
- "kube",
+ "kube 0.50.1",
  "kube-runtime",
  "log",
  "schemars",
@@ -772,6 +772,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "kube"
+version = "0.51.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8d47a55e9f881dc5027dcaf026670fa24b41f67926ab6517e2155488fe9c012a"
+dependencies = [
+ "Inflector",
+ "base64",
+ "bytes",
+ "chrono",
+ "dirs-next",
+ "either",
+ "futures",
+ "http",
+ "hyper",
+ "hyper-timeout",
+ "jsonpath_lib",
+ "k8s-openapi",
+ "log",
+ "pem",
+ "pin-project 1.0.5",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "static_assertions",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "tower",
+ "url",
+]
+
+[[package]]
 name = "kube-derive"
 version = "0.50.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -786,15 +818,15 @@ dependencies = [
 
 [[package]]
 name = "kube-runtime"
-version = "0.50.1"
+version = "0.51.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8880be3d3583d6acbdc56d47da47b974a58e8ac8fcf75bcdd10fc1560433b66b"
+checksum = "69d85c47fe6b8d7c4c3b634614d498a841028fc1ccca4c748e1801266848127b"
 dependencies = [
  "dashmap",
  "derivative",
  "futures",
  "k8s-openapi",
- "kube",
+ "kube 0.51.0",
  "pin-project 1.0.5",
  "serde",
  "smallvec",
@@ -1778,9 +1810,9 @@ dependencies = [
 
 [[package]]
 name = "tower"
-version = "0.4.5"
+version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "713c629c07a3a97f741c140e474e7304294fabec66a43a33f0832e98315ab07f"
+checksum = "f715efe02c0862926eb463e49368d38ddb119383475686178e32e26d15d06a66"
 dependencies = [
  "futures-core",
  "futures-util",
