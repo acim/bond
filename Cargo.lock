@@ -99,7 +99,7 @@ dependencies = [
  "futures",
  "json_env_logger",
  "k8s-openapi",
- "kube",
+ "kube 0.51.0",
  "kube-runtime",
  "log",
  "schemars",
@@ -222,6 +222,41 @@ name = "cpuid-bool"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8aebca1129a03dc6dc2b127edd729435bbc4a37e1d5f4d7513165089ceb02634"
+
+[[package]]
+name = "darling"
+version = "0.12.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a06d4a9551359071d1890820e3571252b91229e0712e7c36b08940e603c5a8fc"
+dependencies = [
+ "darling_core",
+ "darling_macro",
+]
+
+[[package]]
+name = "darling_core"
+version = "0.12.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b443e5fb0ddd56e0c9bfa47dc060c5306ee500cb731f2b91432dd65589a77684"
+dependencies = [
+ "fnv",
+ "ident_case",
+ "proc-macro2",
+ "quote",
+ "strsim",
+ "syn",
+]
+
+[[package]]
+name = "darling_macro"
+version = "0.12.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c0220073ce504f12a70efc4e7cdaea9e9b1b324872e7ad96a208056d7a638b81"
+dependencies = [
+ "darling_core",
+ "quote",
+ "syn",
+]
 
 [[package]]
 name = "dashmap"
@@ -651,6 +686,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "ident_case"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b9e0384b61958566e926dc50660321d12159025e767c18e043daf26b70104c39"
+
+[[package]]
 name = "idna"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -751,6 +792,38 @@ dependencies = [
  "http",
  "hyper",
  "hyper-timeout",
+ "jsonpath_lib",
+ "k8s-openapi",
+ "log",
+ "pem",
+ "pin-project 1.0.5",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "static_assertions",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "tower",
+ "url",
+]
+
+[[package]]
+name = "kube"
+version = "0.51.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8d47a55e9f881dc5027dcaf026670fa24b41f67926ab6517e2155488fe9c012a"
+dependencies = [
+ "Inflector",
+ "base64",
+ "bytes",
+ "chrono",
+ "dirs-next",
+ "either",
+ "futures",
+ "http",
+ "hyper",
+ "hyper-timeout",
  "hyper-tls",
  "jsonpath_lib",
  "k8s-openapi",
@@ -773,11 +846,12 @@ dependencies = [
 
 [[package]]
 name = "kube-derive"
-version = "0.50.0"
+version = "0.51.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9ae799f63607bad1f95ec65932616660393329f95064467ae50c54ddd46da6c8"
+checksum = "c069cf7fcfe148819d01d1ace64ed82d0bef2c5c27efd2dbc073ec4d210becb9"
 dependencies = [
  "Inflector",
+ "darling",
  "proc-macro2",
  "quote",
  "serde_json",
@@ -794,7 +868,7 @@ dependencies = [
  "derivative",
  "futures",
  "k8s-openapi",
- "kube",
+ "kube 0.50.1",
  "pin-project 1.0.5",
  "serde",
  "smallvec",
@@ -1778,9 +1852,9 @@ dependencies = [
 
 [[package]]
 name = "tower"
-version = "0.4.5"
+version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "713c629c07a3a97f741c140e474e7304294fabec66a43a33f0832e98315ab07f"
+checksum = "f715efe02c0862926eb463e49368d38ddb119383475686178e32e26d15d06a66"
 dependencies = [
  "futures-core",
  "futures-util",
