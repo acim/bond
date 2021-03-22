@@ -7,7 +7,7 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1.0.38"
+anyhow = "1.0.39"
 clap = { version = "3.0.0-beta.2" }
 futures = "0.3.13"
 json_env_logger = { version = "0.1.1", features = ["iso-timestamps"] }
@@ -18,5 +18,5 @@ log = ">=0.4.13, <0.4.14" # restricted because json_env_logger compile failes wi
 schemars = "^0.8.0"
 serde = "1.0.124"
 serde_json = "^1.0.64"
-tokio = { version = "1.3.0", features = ["full"] }
+tokio = { version = "1.4.0", features = ["full"] }
 warp = "0.3.0"
