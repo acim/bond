@@ -1,6 +1,6 @@
 [package]
 name = "bond"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Boban Acimovic <boban.acimovic@gmail.com>"]
 edition = "2018"
 
