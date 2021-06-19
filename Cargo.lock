@@ -80,7 +80,7 @@ dependencies = [
  "futures",
  "json_env_logger",
  "k8s-openapi",
- "kube",
+ "kube 0.51.0",
  "kube-runtime",
  "log",
  "schemars",
@@ -766,6 +766,37 @@ dependencies = [
 ]
 
 [[package]]
+name = "kube"
+version = "0.55.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "43a7370e62dacd8f672231c59001ddf00b090648c81b3cde2600bfbfab7518fe"
+dependencies = [
+ "http",
+ "k8s-openapi",
+ "kube-core",
+ "serde",
+ "serde_json",
+ "static_assertions",
+ "thiserror",
+ "url",
+]
+
+[[package]]
+name = "kube-core"
+version = "0.55.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1a12871b580beae491ae6adeed43f261d85c3fb2bf97d53ab9cf9c1c9ffb32e5"
+dependencies = [
+ "http",
+ "k8s-openapi",
+ "once_cell",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "url",
+]
+
+[[package]]
 name = "kube-derive"
 version = "0.51.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -781,15 +812,15 @@ dependencies = [
 
 [[package]]
 name = "kube-runtime"
-version = "0.51.0"
+version = "0.55.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "69d85c47fe6b8d7c4c3b634614d498a841028fc1ccca4c748e1801266848127b"
+checksum = "975f4b3d7742d74ae5c15d3b460b68dea35ee622219e6ea1bc95f71e344ac061"
 dependencies = [
  "dashmap",
  "derivative",
  "futures",
  "k8s-openapi",
- "kube",
+ "kube 0.55.0",
  "pin-project 1.0.6",
  "serde",
  "smallvec",
